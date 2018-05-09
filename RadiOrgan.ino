@@ -1,5 +1,6 @@
 // このスケッチはGR-CITRUS専用です。
 #include "PWMeter4Citrus.h"
+#include "Servo.h"
 
 // パルス幅[usec]
 #define PW_MIN      1100 // 最小
@@ -16,10 +17,20 @@
 #define TH_PLAY       30 // あそび
 
 // ピン番号定数
-#define PIN_SH          10 // STチャンネル
-#define PIN_TH          11 // THチャンネル
-#define PIN_AUX1        12 // AUX1チャンネル
-#define PIN_AUX2        13 // AUX2チャンネル
+#if 1
+#define PIN_OCTAVE      2  // オクターブ表示出力
+#define PIN_KEY         3  // キー表示出力
+#define PIN_VOL         4  // 音量表示出力
+#else
+#define PIN_OCTAVE      0  // オクターブ表示出力
+#define PIN_KEY         1  // キー表示出力
+#define PIN_VOL         5  // 音の強さ表示出力
+#endif
+#define PIN_LED         9  // 受信表示LED出力
+#define PIN_SH          10 // STチャンネル入力
+#define PIN_TH          11 // THチャンネル入力
+#define PIN_AUX1        12 // AUX1チャンネル入力
+#define PIN_AUX2        13 // AUX2チャンネル入力
 
 // パルス幅計測器
 PWMeter pwmeterST;      // STチャンネル
@@ -66,6 +77,28 @@ uint16_t KEY_COUNT[12] = {
 // (実行時にsetup()で計算)
 uint16_t FRET[6];
 
+// メータ表示用サーボの角度定数
+#define POS_NEUTRAL 90  // 中立位置(共通)
+#define POS_OCT3    30  // オクターブ3
+#define POS_OCT4    90  // オクターブ4
+#define POS_OCT5    150 // オクターブ5
+#define POS_KEY_C   30  // キー:C
+#define POS_KEY_B   150 // キー:B
+#define POS_VOL0    30  // 音量ゼロ
+#define POS_VOL100  150 // 音量最大
+
+// 各オクターブの表示角度
+int POS_OCTAVE[3] = {POS_OCT3, POS_OCT4, POS_OCT5};
+// 各キーの表示角度 (実行時にsetup()で計算)
+int POS_KEY[7];
+
+// メータ表示用サーボ
+Servo servoOctave;  // オクターブ
+Servo servoKey;     // キー
+Servo servoVol;     // 音量
+
+// 受信中か？
+bool receiving = false;
 
 // ビープ音の初期化
 void beep_init()
@@ -143,6 +176,10 @@ void setup()
     for(int i = 0; i < 6; i++){
         FRET[i] = PW_MAX - (2*i + 1) * (PW_MAX - PW_MIN) / 12;
     }
+    // キーのメータ表示のための角度定数
+    for(int i = 0; i < 7; i++){
+        POS_KEY[i] = POS_KEY_C + ((POS_KEY_B - POS_KEY_C) * i) / 6;
+    }
     
     // シリアルポートの初期化(デバッグ用)
     Serial.begin(115200);
@@ -155,6 +192,18 @@ void setup()
     
     // ビープ音の初期化
     beep_init();
+    
+    // メータ用のサーボの初期化
+    servoOctave.attach(PIN_OCTAVE);
+    servoKey.attach(PIN_KEY);
+    servoVol.attach(PIN_VOL);
+    servoOctave.write(POS_OCT4);
+    servoKey.write(POS_NEUTRAL);
+    servoVol.write(POS_VOL0);
+    
+    // 受信表示LEDの初期化
+    pinMode(PIN_LED, OUTPUT);
+    digitalWrite(PIN_LED, HIGH);
 }
 
 // メインループ
@@ -167,11 +216,34 @@ void loop()
     static uint16_t th = TH_NEU;
     static uint16_t aux1 = PW_NEU;
     static uint16_t aux2 = PW_NEU;
-    
-    if(pwmeterST.available()) st = pwmeterST.getLast();
-    if(pwmeterTH.available()) th = pwmeterTH.getLast();
-    if(pwmeterAUX1.available()) aux1 = pwmeterAUX1.getLast();
-    if(pwmeterAUX2.available()) aux2 = pwmeterAUX2.getLast();
+    static int no_data_cnt = 0;
+    int cnt = 0;
+    if(pwmeterST.available()){
+        st = pwmeterST.getLast();
+        cnt++;
+    }
+    if(pwmeterTH.available()){
+        th = pwmeterTH.getLast();
+        cnt++;
+    }
+    if(pwmeterAUX1.available()){
+        aux1 = pwmeterAUX1.getLast();
+        cnt++;
+    }
+    if(pwmeterAUX2.available()){
+        aux2 = pwmeterAUX2.getLast();
+        cnt++;
+    }
+    if(cnt == 0){
+        no_data_cnt++;
+        if(no_data_cnt > 10){
+            receiving = false;
+            no_data_cnt = 0;
+        }
+    }else{
+        receiving = true;
+        no_data_cnt = 0;
+    }
     
 #if 1
     // パルス幅確認
@@ -183,9 +255,11 @@ void loop()
 
     // キー判定 (STチャンネル)
     int key = KEY_B;
+    int key2 = 6; // メータ表示用
     for(int i = 0; i < 6; i++){
         if(st > FRET[i]){
             key = SCALE[i];
+            key2 = i;
             break;
         }
     }
@@ -248,6 +322,21 @@ void loop()
 
     // ビープ音出力
     beep_out(key, octave, vol);
+    
+    // オクターブのメータ表示
+    servoOctave.write(POS_OCTAVE[octave + 1]);
+    // キーのメータ表示
+    servoKey.write(POS_KEY[key2]);
+    // 音量のメータ表示
+    int vol_pos = POS_VOL0 + ((POS_VOL100 - POS_VOL0) * vol) / 1024;
+    servoVol.write(vol_pos);
+    
+    // 受信表示LED
+    if(receiving){
+        digitalWrite(PIN_LED, LOW);
+    }else{
+        digitalWrite(PIN_LED, HIGH);
+    }
     
     delay(10);
 }

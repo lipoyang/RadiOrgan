@@ -14,7 +14,7 @@
 #define TH_NEU      1363 // 中立
 #define TH_MAX      1850 // 最大
 #define TH_AMP       480 // 振幅
-#define TH_PLAY       30 // あそび
+#define TH_PLAY       10 // あそび
 
 // ピン番号定数
 #if 1
@@ -99,6 +99,19 @@ Servo servoVol;     // 音量
 
 // 受信中か？
 bool receiving = false;
+
+// 音量テーブル (指数関数)
+int VOL_TABLE[9] = {
+    0,
+    60,
+    90,
+    135,
+    202,
+    303,
+    455,
+    683,
+    1024
+};
 
 // ビープ音の初期化
 void beep_init()
@@ -312,6 +325,14 @@ void loop()
     if(pos < TH_PLAY) pos=0;
     int vol = (int)pos * 1024 / TH_AMP;
     if(vol > 1024) vol =1024;
+    // 音量を指数曲線に変換
+    int n = vol / 128; // n = 0,1...8
+    int m = vol % 128; // m = 0,1...127
+    if(n < 8){
+        vol = VOL_TABLE[n] + ((VOL_TABLE[n+1] - VOL_TABLE[n]) * m) / 128;
+    }else{
+        vol = 1024;
+    }
 
 #if 0
     // キー、オクターブ、音量の確認

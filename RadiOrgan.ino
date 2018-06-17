@@ -77,15 +77,14 @@ uint16_t KEY_COUNT[12] = {
 // (実行時にsetup()で計算)
 uint16_t FRET[6];
 
-// メータ表示用サーボの角度定数
-#define POS_NEUTRAL 90  // 中立位置(共通)
-#define POS_OCT3    30  // オクターブ3
-#define POS_OCT4    90  // オクターブ4
-#define POS_OCT5    150 // オクターブ5
-#define POS_KEY_C   30  // キー:C
-#define POS_KEY_B   150 // キー:B
-#define POS_VOL0    30  // 音量ゼロ
-#define POS_VOL100  150 // 音量最大
+// メータ表示用サーボの角度定数 (実機に合わせて微調整)
+#define POS_OCT3    (120-2)  // オクターブ3
+#define POS_OCT4    (90-2)  // オクターブ4
+#define POS_OCT5    (60-2) // オクターブ5
+#define POS_KEY_C   150 // キー:C
+#define POS_KEY_B   35  // キー:B
+#define POS_VOL0    130  // 音量ゼロ
+#define POS_VOL100  25 // 音量最大
 
 // 各オクターブの表示角度
 int POS_OCTAVE[3] = {POS_OCT3, POS_OCT4, POS_OCT5};
@@ -211,7 +210,7 @@ void setup()
     servoKey.attach(PIN_KEY);
     servoVol.attach(PIN_VOL);
     servoOctave.write(POS_OCT4);
-    servoKey.write(POS_NEUTRAL);
+    servoKey.write(POS_KEY[3]);
     servoVol.write(POS_VOL0);
     
     // 受信表示LEDの初期化

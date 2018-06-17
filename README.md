@@ -3,7 +3,7 @@
 ## ソフトウェア
 - マイコン: GR-CITRUS (ルネサス RX631)
 - 開発環境: IDE for GR v1.03
-- 使用ライブラリ: [PWMeter for GR-CITRUS](https://github.com/lipoyang/PWMeter4Citrus)
+- 使用ライブラリ: [PWMeter for GR-CITRUS](https://github.com/lipoyang/PWMeter4Citrus), [Simple YMF825 driver](https://github.com/lipoyang/SimpleYMF825)
 - ソースコード: [RadiOrgan.ino](RadiOrgan.ino)
 ## 回路
 (開発中)

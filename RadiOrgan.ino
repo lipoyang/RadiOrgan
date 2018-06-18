@@ -60,9 +60,27 @@ uint16_t FRET[6];
 #define POS_VOL100  25      // 音量最大
 
 // 各オクターブの表示角度
-int POS_OCTAVE[3] = {POS_OCT3, POS_OCT4, POS_OCT5};
+const int POS_OCTAVE[3] = {POS_OCT3, POS_OCT4, POS_OCT5};
 // 各キーの表示角度 (実行時にsetup()で計算)
 int POS_KEY[7];
+
+// 調号テーブル (-1:♭ +1:#)
+const int KEY_TABLE[13][7] = {
+//    C   D   E   F   G   A   B
+    {-1, -1, -1,  0, -1, -1, -1}, // [0]:G♭ (変ト長調)
+    { 0, -1, -1,  0, -1, -1, -1}, // [1]:D♭ (変ニ長調)
+    { 0, -1, -1,  0,  0, -1, -1}, // [2]:A♭ (変イ長調)
+    { 0,  0, -1,  0,  0, -1, -1}, // [3]:E♭ (変ホ長調)
+    { 0,  0, -1,  0,  0,  0, -1}, // [4]:B♭ (変ロ長調)
+    { 0,  0,  0,  0,  0,  0, -1}, // [5]:F (ヘ長調)
+    { 0,  0,  0,  0,  0,  0,  0}, // [6]:C (ハ長調)
+    { 0,  0,  0, +1,  0,  0,  0}, // [7]:G (ト長調)
+    {+1,  0,  0, +1,  0,  0,  0}, // [8]:D (ニ長調)
+    {+1,  0,  0, +1, +1,  0,  0}, // [9]:A (イ長調)
+    {+1, +1,  0, +1, +1,  0,  0}, // [10]:E (ホ長調)
+    {+1, +1,  0, +1, +1, +1,  0}, // [11]:B (ロ長調)
+    {+1, +1, +1, +1, +1, +1,  0}, // [12]:F# (嬰ヘ長調)
+};
 
 // メータ表示用サーボ
 Servo servoOctave;  // オクターブ
@@ -224,7 +242,6 @@ void loop()
     }else if(pos < -PW_AUX){
         octave = +1;
     }
-#if 1
     // AUX2チャンネルもオクターブ切り替えに使う (操作性の都合)
     pos = (int16_t)(aux2 - PW_NEU);
     if(pos > PW_AUX){
@@ -233,38 +250,25 @@ void loop()
         octave = +1;
     }
     
-#else
-    // 半音上げ下げ (AUX2チャンネル)
-    pos = (int16_t)(aux2 - PW_NEU);
-    if(pos > PW_AUX){
-        if((octave == 1) && (key == KEY_B)){
-            // B5より上は無効
-        }else{
-            key++; // 半音上げる
-            if(key > KEY_B){
-                key = KEY_C; // Bの半音上は上のオクタープのC
-                octave++;
-            }
-        }
-    }else if(pos < -PW_AUX){
-        if((octave == -1) && (key == KEY_C)){
-            // C3より下は無効
-        }else{
-            key--; // 半音下げる
-            if(key < KEY_C){
-                key = KEY_B; // Cの半音下は下のオクタープのB
-                octave--;
-            }
-        }
-    }
-#endif
-    
     // 音量 (THチャンネル)
     pos = (int16_t)(th - TH_NEU);
     if(pos < TH_PLAY) pos=0;
     int vol = (int)pos * 31 / TH_AMP;
     if(vol > 31) vol = 31;
-
+    
+    // 調号
+    key_sign = KEY_TABLE[scale][key2];
+    int key3 = key + key_sign;
+    int octave2 = octave;
+    if(key3 > KEY_B_SHARP){
+        key3 = KEY_C;
+        octave2++;
+    }
+    else if(key3 < KEY_C){
+        key3 = KEY_B_SHARP;
+        octave2--;
+    }
+    
 #if 0
     // キー、オクターブ、音量の確認
     Serial.print("key:");     Serial.print(key);    Serial.print("\t");
@@ -274,7 +278,7 @@ void loop()
 
     // サウンド出力
     if(vol >= 0){
-        ymf825.keyon(ch_tone, 4+octave, key, vol);
+        ymf825.keyon(ch_tone, 4+octave2, key3, vol);
     }else{
         ymf825.keyoff(ch_tone);
     }

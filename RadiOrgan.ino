@@ -33,6 +33,15 @@
 #define PIN_TONE        15 // 音色切り替え入力
 #define PIN_SCALE       16 // 音階切り替え入力
 
+// 7音音階番号
+#define KEY7_C          0
+#define KEY7_D          1
+#define KEY7_E          2
+#define KEY7_F          3
+#define KEY7_G          4
+#define KEY7_A          5
+#define KEY7_B          6
+
 // FM音源
 SimpleYMF825 ymf825;
 
@@ -120,7 +129,7 @@ void setup()
     servoKey.attach(PIN_KEY);
     servoVol.attach(PIN_VOL);
     servoOctave.write(POS_OCT4);
-    servoKey.write(POS_KEY[3]);
+    servoKey.write(POS_KEY[KEY7_F]);
     servoVol.write(POS_VOL0);
     
     // 受信表示LEDの初期化
@@ -224,31 +233,34 @@ void loop()
 #endif
 
     // キー判定 (STチャンネル)
-    int key = KEY_B;
-    int key2 = 6; // メータ表示用
-    for(int i = 0; i < 6; i++){
+    int key12 = KEY_B;  // 12音音階番号
+    int key7  = KEY7_B; // 7音音階番号
+    for(int i = KEY7_C; i < KEY7_B; i++){
         if(st > FRET[i]){
-            key = SCALE[i];
-            key2 = i;
+            key12 = SCALE[i];
+            key7 = i;
             break;
         }
     }
     
-    // オクターブ切り替え (AUX1チャンネル)
-    int octave = 0;
+    // 相対オクターブ
+    int r_octave = 0; 
+    // AUX1チャンネルでオクターブ切り替え
     pos = (int16_t)(aux1 - PW_NEU);
     if(pos > PW_AUX){
-        octave = -1;
+        r_octave = -1;
     }else if(pos < -PW_AUX){
-        octave = +1;
+        r_octave = +1;
     }
     // AUX2チャンネルもオクターブ切り替えに使う (操作性の都合)
     pos = (int16_t)(aux2 - PW_NEU);
     if(pos > PW_AUX){
-        octave = -1;
+        r_octave = -1;
     }else if(pos < -PW_AUX){
-        octave = +1;
+        r_octave = +1;
     }
+    // 絶対オクターブ
+    int octave = 4 + r_octave;
     
     // 音量 (THチャンネル)
     pos = (int16_t)(th - TH_NEU);
@@ -257,35 +269,34 @@ void loop()
     if(vol > 31) vol = 31;
     
     // 調号
-    key_sign = KEY_TABLE[scale][key2];
-    int key3 = key + key_sign;
-    int octave2 = octave;
-    if(key3 > KEY_B_SHARP){
-        key3 = KEY_C;
-        octave2++;
+    int key_sign = KEY_TABLE[scale][key7];
+    key12 += key_sign;
+    if(key12 > KEY_B){
+        key12 = KEY_C;
+        octave++;
     }
-    else if(key3 < KEY_C){
-        key3 = KEY_B_SHARP;
-        octave2--;
+    else if(key12 < KEY_C){
+        key12 = KEY_B;
+        octave--;
     }
     
 #if 0
     // キー、オクターブ、音量の確認
-    Serial.print("key:");     Serial.print(key);    Serial.print("\t");
+    Serial.print("key12:");   Serial.print(key12);  Serial.print("\t");
     Serial.print("octave:");  Serial.print(octave); Serial.print("\t");
     Serial.print("vol:");     Serial.print(vol);    Serial.print("\n");
 #endif
 
     // サウンド出力
     if(vol >= 0){
-        ymf825.keyon(ch_tone, 4+octave2, key3, vol);
+        ymf825.keyon(ch_tone, octave, key12, vol);
     }else{
         ymf825.keyoff(ch_tone);
     }
     // オクターブのメータ表示
-    servoOctave.write(POS_OCTAVE[octave + 1]);
+    servoOctave.write(POS_OCTAVE[r_octave + 1]);
     // キーのメータ表示
-    servoKey.write(POS_KEY[key2]);
+    servoKey.write(POS_KEY[key7]);
     // 音量のメータ表示
     int vol_pos = POS_VOL0 + ((POS_VOL100 - POS_VOL0) * vol) / 1024;
     servoVol.write(vol_pos);

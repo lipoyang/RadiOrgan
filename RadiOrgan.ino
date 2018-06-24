@@ -23,9 +23,9 @@
 #define PIN_AUX1        2  // AUX1チャンネル入力
 #define PIN_AUX2        3  // AUX2チャンネル入力
 
-#define PIN_OCTAVE      5  // オクターブ表示出力
+#define PIN_OCTAVE      8  // オクターブ表示出力
 #define PIN_KEY         7  // キー表示出力
-#define PIN_VOL         8  // 音量表示出力
+#define PIN_VOL         5  // 音量表示出力
 
 #define PIN_LED         6  // 受信表示LED出力
 
@@ -139,6 +139,15 @@ void setup()
     // FM音源の初期化 (チャンネルと音色を一対一に割り当て)
     ymf825.begin(IOVDD_3V3);
     ymf825.setTone( 0, GRAND_PIANO );
+    ymf825.setTone( 1, TNKL_BELL );
+    ymf825.setTone( 2, CHURCH_ORGAN );
+    ymf825.setTone( 3, FLUTE );
+    ymf825.setTone( 4, ROCK_ORGAN );
+    ymf825.setTone( 5, NYLON_GUITER );
+    ymf825.setTone( 6, HARPSICHORD );
+    ymf825.setTone( 7, HARMONICA );
+/*
+    ymf825.setTone( 0, GRAND_PIANO );
     ymf825.setTone( 1, E_PIANO );
     ymf825.setTone( 2, TENOR_SAX );
     ymf825.setTone( 3, PICK_BASS );
@@ -154,6 +163,7 @@ void setup()
     ymf825.setTone(13, SAW_LEAD );
     ymf825.setTone(14, HARPSICHORD );
     ymf825.setTone(15, HARMONICA );
+*/
     // TODO
     //for(int ch=0;ch<16;ch++){
     //    YMF825.setVolume(ch, 31);
@@ -171,7 +181,7 @@ void loop()
 {
     // マスター音量
     int a_vol = analogRead(PIN_VOLUME);
-    int temp_vol = (a_vol * 64) / 675;
+    int temp_vol = 32 + (a_vol * 32) / 675;
     if (temp_vol > 63) temp_vol = 63;
     if(master_vol != temp_vol){
         master_vol = temp_vol;
@@ -180,8 +190,8 @@ void loop()
     
     // 音色
     int a_tone = analogRead(PIN_TONE);
-    ch_tone = (a_tone * 16) / 675;
-    if(ch_tone > 15) ch_tone = 15;
+    ch_tone = (a_tone * 8) / 675;
+    if(ch_tone > 7) ch_tone = 7;
     
     // 音階 TODO
     int a_scale = analogRead(PIN_SCALE);
@@ -224,7 +234,7 @@ void loop()
         no_data_cnt = 0;
     }
     
-#if 1
+#if 0
     // パルス幅確認
     Serial.print("ST:");    Serial.print(st);   Serial.print("  ");
     Serial.print("TH:");    Serial.print(th);   Serial.print("  ");
@@ -269,6 +279,7 @@ void loop()
     if(vol > 31) vol = 31;
     
     // 調号
+/*
     int key_sign = KEY_TABLE[scale][key7];
     key12 += key_sign;
     if(key12 > KEY_B){
@@ -279,26 +290,31 @@ void loop()
         key12 = KEY_B;
         octave--;
     }
-    
-#if 0
+*/
+
+#if 1
     // キー、オクターブ、音量の確認
+    Serial.print("ch_tone:");   Serial.print(ch_tone);  Serial.print("\t");
     Serial.print("key12:");   Serial.print(key12);  Serial.print("\t");
     Serial.print("octave:");  Serial.print(octave); Serial.print("\t");
     Serial.print("vol:");     Serial.print(vol);    Serial.print("\n");
 #endif
 
     // サウンド出力
-    if(vol >= 0){
+    if(vol > 0){
         ymf825.keyon(ch_tone, octave, key12, vol);
+        //ymf825.keyon(0, 4, KEY_C, vol);
     }else{
         ymf825.keyoff(ch_tone);
     }
+//    ymf825.keyon(0, 4, KEY_C, 31);
+    
     // オクターブのメータ表示
     servoOctave.write(POS_OCTAVE[r_octave + 1]);
     // キーのメータ表示
     servoKey.write(POS_KEY[key7]);
     // 音量のメータ表示
-    int vol_pos = POS_VOL0 + ((POS_VOL100 - POS_VOL0) * vol) / 1024;
+    int vol_pos = POS_VOL0 + ((POS_VOL100 - POS_VOL0) * pos) / TH_AMP;
     servoVol.write(vol_pos);
     
     // 受信表示LED

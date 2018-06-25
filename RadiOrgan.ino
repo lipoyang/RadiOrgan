@@ -16,6 +16,8 @@
 #define TH_MAX      1850 // 最大
 #define TH_AMP       480 // 振幅
 #define TH_PLAY       10 // あそび
+#define TH_KEYON1     50 // 打鍵閾値1
+#define TH_KEYON2    240 // 打鍵閾値1
 
 // ピン番号定数
 #define PIN_SH          0  // STチャンネル入力
@@ -41,6 +43,11 @@
 #define KEY7_G          4
 #define KEY7_A          5
 #define KEY7_B          6
+
+// 打鍵状態
+#define KEY_OFF         0
+#define KEY_ON1         1
+#define KEY_ON2         2
 
 // FM音源
 SimpleYMF825 ymf825;
@@ -102,6 +109,10 @@ bool receiving = false;
 int master_vol;     // マスター音量
 int ch_tone;        // 音色(チャンネルと音色を一対一に割り当て)
 int scale;          // 音階(何調か、つまりどこに#や♭が付くか)
+int key_state;      // 打鍵状態
+int ch_keyon;       // 打鍵した音色
+uint32_t time_keyon1; // 打鍵時刻1
+uint32_t time_keyon2; // 打鍵時刻2
 
 // 初期化
 void setup()
@@ -146,34 +157,15 @@ void setup()
     ymf825.setTone( 5, NYLON_GUITER );
     ymf825.setTone( 6, HARPSICHORD );
     ymf825.setTone( 7, HARMONICA );
-/*
-    ymf825.setTone( 0, GRAND_PIANO );
-    ymf825.setTone( 1, E_PIANO );
-    ymf825.setTone( 2, TENOR_SAX );
-    ymf825.setTone( 3, PICK_BASS );
-    ymf825.setTone( 4, TNKL_BELL );
-    ymf825.setTone( 5, NEW_AGE_PD );
-    ymf825.setTone( 6, BRIGHT_PIANO );
-    ymf825.setTone( 7, VIBES );
-    ymf825.setTone( 8, CHURCH_ORGAN );
-    ymf825.setTone( 9, FLUTE );
-    ymf825.setTone(10, ROCK_ORGAN );
-    ymf825.setTone(11, NYLON_GUITER );
-    ymf825.setTone(12, SQUARE_LEAD );
-    ymf825.setTone(13, SAW_LEAD );
-    ymf825.setTone(14, HARPSICHORD );
-    ymf825.setTone(15, HARMONICA );
-*/
-    // TODO
-    //for(int ch=0;ch<16;ch++){
-    //    YMF825.setVolume(ch, 31);
-    //}
     
     // マスター音量
     int a_vol = analogRead(PIN_VOLUME);
     master_vol = (a_vol * 64) / 675;
     if (master_vol > 63) master_vol = 63;
     ymf825.setMasterVolume(master_vol);
+    
+    // 打鍵状態
+    key_state = KEY_OFF;
 }
 
 // メインループ
@@ -192,8 +184,9 @@ void loop()
     int a_tone = analogRead(PIN_TONE);
     ch_tone = (a_tone * 8) / 675;
     if(ch_tone > 7) ch_tone = 7;
+    ch_tone = 0;
     
-    // 音階 TODO
+    // 音階
     int a_scale = analogRead(PIN_SCALE);
     scale = (a_scale * 14) / 675;
     if(scale > 13) scale = 13;
@@ -274,9 +267,11 @@ void loop()
     
     // 音量 (THチャンネル)
     pos = (int16_t)(th - TH_NEU);
-    if(pos < TH_PLAY) pos=0;
-    int vol = (int)pos * 31 / TH_AMP;
-    if(vol > 31) vol = 31;
+    //Serial.println(pos);
+    
+//    if(pos < TH_PLAY) pos=0;
+//    int vol = (int)pos * 31 / TH_AMP;
+//    if(vol > 31) vol = 31;
     
     // 調号
 /*
@@ -291,8 +286,53 @@ void loop()
         octave--;
     }
 */
+    
+    int vol;
+    static int pos_old = 0;
+    static int keyon_cnt = 0;
+    bool is_keyon = false;
+    switch(key_state){
+        case KEY_OFF:
+            if(pos > TH_PLAY){
+                key_state = KEY_ON1;
+                pos_old = pos;
+                keyon_cnt = 0;
+//                time_keyon1 = micros();
+            }
+            break;
+        case KEY_ON1:
+            Serial.println(pos);
+            keyon_cnt++;
+            if(keyon_cnt > 20){
+                is_keyon = true;
+            }else{
+                if(pos >= pos_old){
+                  pos_old = pos;
+                }else{
+                    is_keyon = true;
+                }
+            }
+            if(is_keyon){
+                vol = (int)pos_old * 31 / TH_AMP;
+                if(vol > 31) vol = 31;
+                Serial.print(pos_old);Serial.print("  ");
+                Serial.print(pos);Serial.print("  ");
+                Serial.println(vol);
+                ymf825.keyon(ch_tone, octave, key12, vol);
+                ch_keyon = ch_tone;
+                key_state = KEY_ON2;
+            }
+            break;
+        case KEY_ON2:
+            if(pos < TH_PLAY){
+                key_state = KEY_OFF;
+                ymf825.keyoff(ch_keyon);
+            }
+            break;
+    }
 
-#if 1
+
+#if 0
     // キー、オクターブ、音量の確認
     Serial.print("ch_tone:");   Serial.print(ch_tone);  Serial.print("\t");
     Serial.print("key12:");   Serial.print(key12);  Serial.print("\t");
@@ -301,13 +341,11 @@ void loop()
 #endif
 
     // サウンド出力
-    if(vol > 0){
-        ymf825.keyon(ch_tone, octave, key12, vol);
-        //ymf825.keyon(0, 4, KEY_C, vol);
-    }else{
-        ymf825.keyoff(ch_tone);
-    }
-//    ymf825.keyon(0, 4, KEY_C, 31);
+//    if(vol > 0){
+//        ymf825.keyon(ch_tone, octave, key12, vol);
+//    }else{
+//        ymf825.keyoff(ch_tone);
+//    }
     
     // オクターブのメータ表示
     servoOctave.write(POS_OCTAVE[r_octave + 1]);
@@ -324,6 +362,6 @@ void loop()
         digitalWrite(PIN_LED, HIGH);
     }
     
-    delay(10);
+    delay(5);
 }
 

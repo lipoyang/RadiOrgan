@@ -30,6 +30,7 @@ int key_state = KEY_OFF;// 打鍵状態
 int master_vol = -1;    // マスター音量
 int tone_no = -1;       // 音色
 int scale;              // 音階(何調か、つまりどこに#や♭が付くか)
+int ch_num = 0;         // 発声するチャンネル
 
 // 初期化
 void setup()
@@ -113,7 +114,7 @@ void analog_input()
     if(tone_temp > 7) tone_temp = 7;
     if(tone_no != tone_temp){
         tone_no = tone_temp;
-        ymf825.setTone( 0, TONE_TABLE[tone_no] );
+        //ymf825.setTone( 0, TONE_TABLE[tone_no] );
     }
     
     // 音階
@@ -224,10 +225,24 @@ void sound_output(int octave, int key12, int vol)
     // 管楽器系
     if(tone_no >= 4)
     {
-        if(vol > 0){
-            ymf825.keyon(0, octave, key12, vol);
-        }else{
-            ymf825.keyoff(0);
+        switch(key_state){
+            case KEY_OFF:
+                if(vol > 0){
+                    ch_num = (ch_num + 1) & 0x0F; // mod 16
+                    ymf825.keyoff(ch_num);
+                    ymf825.setTone(ch_num, TONE_TABLE[tone_no] );
+                    ymf825.keyon(ch_num, octave, key12, vol);
+                    key_state = KEY_ON1;
+                }
+                break;
+            case KEY_ON1:
+                if(vol == 0){
+                    //ymf825.keyoff(0);
+                    key_state = KEY_OFF;
+                }else{
+                    ymf825.keyon(ch_num, octave, key12, vol);
+                }
+                break;
         }
     }
     // 弦楽器系
@@ -245,6 +260,9 @@ void sound_output(int octave, int key12, int vol)
                 }
                 break;
             case KEY_ON1:
+                if(vol == 0){
+                    key_state = KEY_OFF;
+                }
                 keyon_cnt++;
                 if(keyon_cnt > 20){
                     is_keyon = true;
@@ -256,14 +274,17 @@ void sound_output(int octave, int key12, int vol)
                     }
                 }
                 if(is_keyon){
-                    ymf825.keyon(0, octave, key12, vol_old);
+                    ch_num = (ch_num + 1) & 0x0F; // mod 16
+                    ymf825.keyoff(ch_num);
+                    ymf825.setTone(ch_num, TONE_TABLE[tone_no] );
+                    ymf825.keyon(ch_num, octave, key12, vol_old);
                     key_state = KEY_ON2;
                 }
                 break;
             case KEY_ON2:
                 if(vol == 0){
+                    //ymf825.keyoff(0);
                     key_state = KEY_OFF;
-                    ymf825.keyoff(0);
                 }
                 break;
         }

@@ -101,7 +101,8 @@ void analog_input()
 {
     // マスター音量
     int a_vol = analogRead(PIN_VOLUME);
-    int temp_vol = 32 + (a_vol * 32) / 675;
+    int temp_vol = 32 + ((a_vol + 675/(2*(32-1))) * (32-1)) / 675;
+    if (temp_vol <= 32) temp_vol = 0;
     if (temp_vol > 63) temp_vol = 63;
     if(master_vol != temp_vol){
         master_vol = temp_vol;
@@ -110,17 +111,19 @@ void analog_input()
     
     // 音色
     int a_tone = analogRead(PIN_TONE);
-    int tone_temp = (a_tone * 8) / 675;
+    int tone_temp = ((a_tone + 675/(2*(8-1))) * (8-1)) / 675;
     if(tone_temp > 7) tone_temp = 7;
     if(tone_no != tone_temp){
         tone_no = tone_temp;
-        //ymf825.setTone( 0, TONE_TABLE[tone_no] );
+        ymf825.keyoff(ch_num);
+        //Serial.print(a_tone);Serial.print("\t");Serial.println(tone_no);
     }
     
     // 音階
     int a_scale = analogRead(PIN_SCALE);
-    scale = (a_scale * 14) / 675;
-    if(scale > 13) scale = 13;
+    scale = ((a_scale + 675/(2*(13-1))) * (13-1)) / 675;
+    if(scale > 12) scale = 12;
+    //Serial.print(scale);Serial.print("\t");Serial.println(a_scale);
 }
 
 // パルス幅の取得
@@ -198,7 +201,6 @@ void sound_calc(int &key12, int &key7, int &r_octave, int &octave, int &vol, int
     octave = 4 + r_octave;
     
     // 調号
-/*
     int key_sign = KEY_TABLE[scale][key7];
     key12 += key_sign;
     if(key12 > KEY_B){
@@ -209,7 +211,6 @@ void sound_calc(int &key12, int &key7, int &r_octave, int &octave, int &vol, int
         key12 = KEY_B;
         octave--;
     }
-*/
     
     // 音量 (THチャンネル)
     pw = (int16_t)(th - TH_NEU);
@@ -237,7 +238,7 @@ void sound_output(int octave, int key12, int vol)
                 break;
             case KEY_ON1:
                 if(vol == 0){
-                    //ymf825.keyoff(0);
+                    ymf825.keyoff(ch_num);
                     key_state = KEY_OFF;
                 }else{
                     ymf825.keyon(ch_num, octave, key12, vol);

@@ -31,6 +31,7 @@ int master_vol = -1;    // マスター音量
 int tone_no = -1;       // 音色
 int scale;              // 音階(何調か、つまりどこに#や♭が付くか)
 int ch_num = 0;         // 発声するチャンネル
+int16_t TH_AMP;         // スロットルの振幅(TH_AMP_H または TH_AMP_B)
 
 // 初期化
 void setup()
@@ -115,7 +116,10 @@ void analog_input()
     if(tone_temp > 7) tone_temp = 7;
     if(tone_no != tone_temp){
         tone_no = tone_temp;
-        ymf825.keyoff(ch_num);
+        for(int i=0; i<16; i++){
+            ymf825.keyoff(i);
+        }
+        key_state = KEY_OFF;
         //Serial.print(a_tone);Serial.print("\t");Serial.println(tone_no);
     }
     
@@ -214,10 +218,36 @@ void sound_calc(int &key12, int &key7, int &r_octave, int &octave, int &vol, int
     
     // 音量 (THチャンネル)
     pw = (int16_t)(th - TH_NEU);
-    if(pw < TH_PLAY) pw=0;
-    vol = (int)pw * 31 / TH_AMP;
-    if(vol > 31) vol = 31;
-    pw_vol = pw;
+    // アクセル操作
+    if(pw > 0)
+    {
+        TH_AMP = TH_AMP_H;
+        if(pw < TH_PLAY) pw=0;
+        vol = (int)pw * 31 / TH_AMP;
+        if(vol > 31) vol = 31;
+        pw_vol = pw;
+    }
+    // ブレーキ操作 (半音上げる)
+    else
+    {
+        TH_AMP = TH_AMP_B;
+        pw = -pw;
+        if(pw < TH_PLAY) pw=0;
+        vol = (int)pw * 31 / TH_AMP;
+        if(vol > 31) vol = 31;
+        pw_vol = pw;
+        
+        // 半音上げる
+        key12++;
+        if(key12 > KEY_B){
+            key12 = KEY_C;
+            octave++;
+        }
+        else if(key12 < KEY_C){
+            key12 = KEY_B;
+            octave--;
+        }
+    }
 }
 
 // サウンド出力
@@ -254,14 +284,14 @@ void sound_output(int octave, int key12, int vol)
         bool is_keyon = false;
         switch(key_state){
             case KEY_OFF:
-                if(vol > 0){
+                if(vol > STRINGS_MIN){
                     key_state = KEY_ON1;
                     vol_old = vol;
                     keyon_cnt = 0;
                 }
                 break;
             case KEY_ON1:
-                if(vol == 0){
+                if(vol <= STRINGS_MIN){
                     key_state = KEY_OFF;
                 }
                 keyon_cnt++;
@@ -283,7 +313,7 @@ void sound_output(int octave, int key12, int vol)
                 }
                 break;
             case KEY_ON2:
-                if(vol == 0){
+                if(vol <= STRINGS_MIN){
                     //ymf825.keyoff(0);
                     key_state = KEY_OFF;
                 }

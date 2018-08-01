@@ -25,7 +25,8 @@
 #define TH_MIN      1050 // 最小
 #define TH_NEU      1363 // 中立
 #define TH_MAX      1850 // 最大
-#define TH_AMP       480 // 振幅
+#define TH_AMP_H     480 // 振幅 (アクセル側)
+#define TH_AMP_B     310 // 振幅 (ブレーキ側)
 #define TH_PLAY       10 // あそび
 
 // 7音音階番号
@@ -50,6 +51,9 @@
 #define POS_KEY_B   35      // キー:B
 #define POS_VOL0    130     // 音量ゼロ
 #define POS_VOL100  25      // 音量最大
+
+// 弦楽器の最小音量閾値
+#define STRINGS_MIN     3
 
 // 音階 (ハ長調) テーブル
 int SCALE[7] = {KEY_C, KEY_D, KEY_E, KEY_F, KEY_G, KEY_A, KEY_B};

@@ -15,7 +15,7 @@
 
 ## プロポと受信機
 - プロポ : SANWA MT-44
-- 受信機 : SANWA RX-482
+- 受信機 : SANWA RX-481
 ## プロポの設定
 - SYSTEM > BIND
     - RF MODE : FH4T
